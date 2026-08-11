@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx --yes create-next-app@latest workout-planner-tmp --ts --tailwind --app --eslint --no-src-dir --import-alias \"@/*\" --use-npm --disable-git --yes)",
+      "Bash(npm install *)",
+      "Bash(docker compose *)",
+      "Bash(npx prisma *)",
+      "Bash(npm run *)",
+      "Bash(disown)",
+      "Bash(curl -s http://localhost:3000/api/workout-logs)",
+      "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>JSON.parse\\(d\\).forEach\\(l=>console.log\\(l.id\\)\\)\\)\")",
+      "Bash(curl -s -o /dev/null -w \"/workouts/calendar -> %{http_code}\\\\n\" http://localhost:3000/workouts/calendar)",
+      "Bash(curl -s -o /dev/null -w \"/workouts/log/new?date=2026-08-02 -> %{http_code}\\\\n\" \"http://localhost:3000/workouts/log/new?date=2026-08-02\")"
+    ]
+  }
+}

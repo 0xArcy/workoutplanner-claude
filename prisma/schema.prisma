@@ -1,0 +1,93 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// A single local profile (this is a single-user, local app - no accounts/auth).
+model Profile {
+  id   String  @id @default(cuid())
+  name String
+  unit String  @default("kg") // "kg" | "lb"
+  goal String?
+}
+
+// A reusable workout plan, e.g. "Upper Day", made of planned exercises.
+model WorkoutTemplate {
+  id        String             @id @default(cuid())
+  name      String
+  category  String?
+  createdAt DateTime           @default(now())
+  exercises TemplateExercise[]
+  logs      WorkoutLog[]
+}
+
+// One planned exercise inside a template, e.g. "Bench Press, 4 sets x 8-12 reps".
+model TemplateExercise {
+  id         String          @id @default(cuid())
+  name       String
+  targetSets Int
+  targetReps String
+  notes      String?
+  order      Int             @default(0)
+  template   WorkoutTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  templateId String
+}
+
+// One actual workout session performed on a given date, based on a template.
+model WorkoutLog {
+  id           String           @id @default(cuid())
+  date         DateTime
+  templateName String
+  template     WorkoutTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  templateId   String?
+  exercises    LoggedExercise[]
+}
+
+// One exercise performed during a session, holding the sets actually done.
+model LoggedExercise {
+  id           String      @id @default(cuid())
+  exerciseName String
+  order        Int         @default(0)
+  log          WorkoutLog  @relation(fields: [logId], references: [id], onDelete: Cascade)
+  logId        String
+  sets         LoggedSet[]
+}
+
+// One set: reps x weight, flagged as a personal record if it beats prior history.
+model LoggedSet {
+  id               String         @id @default(cuid())
+  setNumber        Int
+  reps             Int
+  weight           Float
+  isPR             Boolean        @default(false)
+  loggedExercise   LoggedExercise @relation(fields: [loggedExerciseId], references: [id], onDelete: Cascade)
+  loggedExerciseId String
+}
+
+// One day's food log: what was eaten plus that day's body weight.
+model DailyDietLog {
+  id         String      @id @default(cuid())
+  date       DateTime    @unique
+  bodyWeight Float?
+  entries    FoodEntry[]
+}
+
+// One food item logged on a given day.
+model FoodEntry {
+  id         String       @id @default(cuid())
+  name       String
+  calories   Int
+  protein    Float?
+  carbs      Float?
+  fat        Float?
+  time       String?
+  dailyLog   DailyDietLog @relation(fields: [dailyLogId], references: [id], onDelete: Cascade)
+  dailyLogId String
+}

@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+/* Enables `dark:` Tailwind classes based on a `.dark` class on <html>,
+   which next-themes toggles for us, instead of only the OS setting. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --background: #f7f7f9;
+  --foreground: #16181d;
+
+  --card: #ffffff;
+  --card-foreground: #16181d;
+
+  --border: #e4e4e8;
+  --input: #e4e4e8;
+  --ring: #6366f1;
+
+  --muted: #f0f0f3;
+  --muted-foreground: #6b7280;
+
+  --primary: #4f46e5;
+  --primary-foreground: #ffffff;
+
+  --secondary: #f0f0f3;
+  --secondary-foreground: #16181d;
+
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+
+  /* Used for personal-record highlights across the app. */
+  --pr: #b45309;
+  --pr-foreground: #ffffff;
+}
+
+.dark {
+  --background: #0b0d12;
+  --foreground: #e5e7eb;
+
+  --card: #13161d;
+  --card-foreground: #e5e7eb;
+
+  --border: #23262f;
+  --input: #23262f;
+  --ring: #818cf8;
+
+  --muted: #191c24;
+  --muted-foreground: #9ca3af;
+
+  --primary: #818cf8;
+  --primary-foreground: #101223;
+
+  --secondary: #191c24;
+  --secondary-foreground: #e5e7eb;
+
+  --destructive: #f87171;
+  --destructive-foreground: #101223;
+
+  --pr: #f59e0b;
+  --pr-foreground: #101223;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-pr: var(--pr);
+  --color-pr-foreground: var(--pr-foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+}
