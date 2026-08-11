@@ -1,36 +1,41 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Workout Planner
 
-## Getting Started
+A local, single-user workout and diet tracker: build workout templates, log
+sessions from them with automatic personal-record detection, track daily
+food and body weight, see analytics, and export a PDF report. Everything is
+stored locally in a PostgreSQL database - nothing leaves your machine.
 
-First, run the development server:
+## For Windows users (no coding experience needed)
+
+No Docker, no WSL - just double-click and wait.
+
+1. Download this repository (green "Code" button on GitHub -> "Download ZIP"), then unzip it. Or, if you have Git, `git clone` it.
+2. Open the `scripts\windows` folder.
+3. Double-click **`Install.bat`**.
+4. Click "Yes" if Windows asks for permission. Then just wait - it installs everything it needs (Node.js, PostgreSQL) and sets the app up. This can take several minutes the first time.
+5. When it finishes, your browser opens automatically to the app.
+
+That's it - it also sets itself to start automatically every time you log in (and PostgreSQL runs as its own Windows service that starts on its own too), so you never need to run anything again. To turn that off later, double-click `scripts\windows\Uninstall.bat`.
+
+## For development
+
+Requirements: Node.js 20+, Docker.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+docker compose up -d        # start Postgres
+npm install
+npx prisma migrate dev      # create the database tables
+npm run dev                 # start the dev server at http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Useful scripts:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run dev:stop            # stop whatever's running on port 3000
+npm run build && npm run start   # production build/run
+npx prisma studio           # browse the database in a UI
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Stack
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Next.js (App Router) + TypeScript, Tailwind CSS, PostgreSQL via Prisma, Next.js API routes as the backend called from React via `fetch`, recharts for analytics, jsPDF for report export.

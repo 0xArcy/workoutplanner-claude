@@ -1,11 +1,12 @@
 # Workout Planner - one-time setup for Windows.
 #
+# No Docker and no WSL - the database runs as a normal Windows service.
+#
 # What this does, in order:
-#   1. Installs Node.js and Docker Desktop if they aren't already installed.
-#   2. Turns on WSL2 (Docker Desktop needs it) if it isn't already on.
-#   3. Starts Docker Desktop and the app's database.
-#   4. Installs the app and sets up the database tables.
-#   5. Builds the app and makes it start automatically every time you log in.
+#   1. Installs Node.js and PostgreSQL if they aren't already installed.
+#   2. Creates the app's database and database user.
+#   3. Installs the app and sets up the database tables.
+#   4. Builds the app and makes it start automatically every time you log in.
 #
 # You do not need to know what any of that means. Just double-click
 # Install.bat and follow any messages this window shows you.
@@ -15,9 +16,15 @@
 $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 
+$PgServiceName = "postgresql-workoutplanner"
+$PgSuperPassword = "workoutplanner"
+$PgPort = 5432
+$AppDbUser = "workout"
+$AppDbPassword = "workout"
+$AppDbName = "workoutplanner"
+
 function Write-Step($msg) { Write-Host "`n==> $msg" -ForegroundColor Cyan }
 function Write-Ok($msg) { Write-Host "    $msg" -ForegroundColor Green }
-function Write-Warn($msg) { Write-Host "    $msg" -ForegroundColor Yellow }
 function Stop-WithMessage($msg) {
     Write-Host "`n$msg" -ForegroundColor Red
     Read-Host "`nPress Enter to close this window"
@@ -63,51 +70,58 @@ if (-not (Test-Command "node")) {
     Stop-WithMessage "Node.js was installed but this window can't see it yet. Close this window and double-click Install.bat again."
 }
 
-# --- Docker Desktop ---
-Write-Step "Checking for Docker Desktop"
-if (-not (Test-Command "docker")) {
-    Write-Host "    Installing Docker Desktop (this can take several minutes)..."
-    winget install -e --id Docker.DockerDesktop --accept-package-agreements --accept-source-agreements | Out-Host
-    Update-SessionPath
-} else {
-    Write-Ok "Already installed."
-}
-
-# Docker Desktop needs WSL2. Turn it on if it's missing (needs a restart to finish).
-Write-Step "Checking Windows features Docker needs (WSL2)"
-$wslFeature = Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux
-$vmFeature = Get-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform
-$needsReboot = $false
-if ($wslFeature.State -ne "Enabled") {
-    Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux -NoRestart | Out-Null
-    $needsReboot = $true
-}
-if ($vmFeature.State -ne "Enabled") {
-    Enable-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform -NoRestart | Out-Null
-    $needsReboot = $true
-}
-if ($needsReboot) {
-    Stop-WithMessage "Windows needs to restart once to finish turning on WSL2 (needed by Docker).`n`nPlease restart your computer, then double-click Install.bat again - it will pick up right where it left off."
-}
-Write-Ok "WSL2 is on."
-
-# --- Start Docker Desktop and wait until it's ready ---
-Write-Step "Starting Docker Desktop"
-$dockerExe = "$Env:ProgramFiles\Docker\Docker\Docker Desktop.exe"
-if (-not (Get-Process "Docker Desktop" -ErrorAction SilentlyContinue) -and (Test-Path $dockerExe)) {
-    Start-Process $dockerExe
-}
-Write-Host "    Waiting for Docker to finish starting (can take a minute or two the first time)..."
-$dockerReady = $false
-for ($i = 0; $i -lt 60; $i++) {
-    docker info *> $null
-    if ($LASTEXITCODE -eq 0) { $dockerReady = $true; break }
+# --- PostgreSQL, as a native Windows service (no Docker, no WSL) ---
+Write-Step "Checking for PostgreSQL"
+$pgService = Get-Service -Name $PgServiceName -ErrorAction SilentlyContinue
+if (-not $pgService) {
+    Write-Host "    Installing PostgreSQL as a Windows service (a few minutes)..."
+    $installerArgs = "--mode unattended --unattendedmodeui minimal " +
+        "--superpassword $PgSuperPassword --servicename $PgServiceName " +
+        "--serverport $PgPort --disable-components stackbuilder"
+    winget install -e --id PostgreSQL.PostgreSQL --silent `
+        --accept-package-agreements --accept-source-agreements `
+        --override $installerArgs | Out-Host
     Start-Sleep -Seconds 5
+    $pgService = Get-Service -Name $PgServiceName -ErrorAction SilentlyContinue
 }
-if (-not $dockerReady) {
-    Stop-WithMessage "Docker Desktop didn't finish starting. Open it manually from the Start menu, wait until it says 'Engine running', then double-click Install.bat again."
+if (-not $pgService) {
+    Stop-WithMessage "PostgreSQL installed but the '$PgServiceName' service wasn't found. Open 'Services' (search the Start menu) and check for a PostgreSQL service, then double-click Install.bat again."
 }
-Write-Ok "Docker is ready."
+if ($pgService.Status -ne "Running") {
+    Set-Service -Name $PgServiceName -StartupType Automatic
+    Start-Service -Name $PgServiceName
+}
+Write-Ok "PostgreSQL service is running."
+
+# Find psql/createdb next to the service so we can set up the app's database.
+$pgBin = $null
+$candidate = Get-ChildItem "$Env:ProgramFiles\PostgreSQL" -Directory -ErrorAction SilentlyContinue |
+    Sort-Object Name -Descending | Select-Object -First 1
+if ($candidate) { $pgBin = Join-Path $candidate.FullName "bin" }
+if (-not $pgBin -or -not (Test-Path "$pgBin\psql.exe")) {
+    Stop-WithMessage "Couldn't find PostgreSQL's psql.exe under Program Files\PostgreSQL. Please reinstall PostgreSQL and try again."
+}
+
+Write-Step "Setting up the app's database"
+$env:PGPASSWORD = $PgSuperPassword
+$psql = "$pgBin\psql.exe"
+
+$roleExists = & $psql -U postgres -h localhost -p $PgPort -tA -c "SELECT 1 FROM pg_roles WHERE rolname='$AppDbUser'" 2>$null
+if ($roleExists -ne "1") {
+    & $psql -U postgres -h localhost -p $PgPort -c "CREATE ROLE $AppDbUser LOGIN PASSWORD '$AppDbPassword';" | Out-Null
+    Write-Ok "Created database user."
+} else {
+    Write-Ok "Database user already exists."
+}
+
+$dbExists = & $psql -U postgres -h localhost -p $PgPort -tA -c "SELECT 1 FROM pg_database WHERE datname='$AppDbName'" 2>$null
+if ($dbExists -ne "1") {
+    & $psql -U postgres -h localhost -p $PgPort -c "CREATE DATABASE $AppDbName OWNER $AppDbUser;" | Out-Null
+    Write-Ok "Created database."
+} else {
+    Write-Ok "Database already exists."
+}
+Remove-Item Env:\PGPASSWORD
 
 # --- Project setup ---
 Set-Location $ProjectRoot
@@ -119,11 +133,6 @@ if (-not (Test-Path ".env")) {
 } else {
     Write-Ok ".env already exists."
 }
-
-Write-Step "Starting the database"
-docker compose up -d
-if ($LASTEXITCODE -ne 0) { Stop-WithMessage "Could not start the database container." }
-Write-Ok "Database container is running."
 
 Write-Step "Installing the app's dependencies (this can take a few minutes the first time)"
 npm ci
@@ -153,6 +162,7 @@ $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoi
     -StartWhenAvailable -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
 Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
 Write-Ok "Done - Workout Planner will now start automatically every time you log in."
+Write-Ok "(PostgreSQL runs as its own Windows service and starts on its own at boot - nothing to remember there either.)"
 
 # --- Start it right now, too ---
 Write-Step "Starting Workout Planner"
